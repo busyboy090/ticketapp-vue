@@ -61,9 +61,9 @@
 
     // Props
     const props = defineProps({
-        ticket: { type: Object, required: true },
-        onEdit: { type: Function, required: true },
-        onRemove: { type: Function, required: false },
+      ticket: { type: Object, required: true },
+      onEdit: { type: Function, required: true },
+      onDelete: { type: Function, required: false },
     });
 
     const show = ref(true);
@@ -76,9 +76,7 @@
 
     // Handle Delete
     const handleDelete = () => {
-        deleteTicket(props.ticket.id);
-        show.value = false;
-        if (props.onRemove) props.onRemove(props.ticket.id);
+      props.onDelete(props.ticket)
     };
 
     const statusClass = computed(() => {

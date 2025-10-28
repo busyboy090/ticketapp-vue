@@ -180,7 +180,7 @@
         toast.success("Signup successful!")
         setTimeout(() => router.push("/auth/login"), 1000)
       } catch (err) {
-        toast.error("Signup failed")
+        toast.error(err.message || "Signup failed")
       }finally {
         loading.value = false
       }

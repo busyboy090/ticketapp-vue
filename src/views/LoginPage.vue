@@ -6,9 +6,10 @@
       <form @submit.prevent="handleSubmit" class="space-y-4">
         <!-- Email -->
         <div>
-          <label>Email *</label>
+          <label for="email">Email *</label>
           <input
             type="email"
+            id="email"
             class="border rounded-lg w-full p-2 pr-10"
             v-model="email"
             aria-describedby="email-error"

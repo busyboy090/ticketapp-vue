@@ -4,6 +4,7 @@ import LoginPage from '../views/LoginPage.vue';
 import SignupPage from '../views/SignupPage.vue';
 import Dashboard from '../views/Dashboard.vue';
 import Tickets from '../views/Tickets.vue';
+import NotFound from '../views/NotFound.vue';
 import { getSession } from '../services/authService';
 import { toast } from 'vue3-toastify';
 
@@ -12,7 +13,8 @@ const routes = [
   { path: '/auth/login', name: 'Login', component: LoginPage },
   { path: '/auth/signup', name: 'Signup', component: SignupPage },
   { path: '/dashboard', name: 'Dashboard', component: Dashboard, meta: { requiresAuth: true } },
-  { path: '/tickets', name: 'Tickets', component: Tickets, meta: { requiresAuth: true } }
+  { path: '/tickets', name: 'Tickets', component: Tickets, meta: { requiresAuth: true } },
+  { path: '/:pathMatch(.*)*', name: "NotFound", component: NotFound}
 ];
 
 const router = createRouter({
@@ -25,7 +27,6 @@ router.beforeEach((to, from, next) => {
 
   if (to.meta.requiresAuth) {
     if (!session) {
-      toast.error("Please log in to access this page.");
       next("/auth/login");
     } else if (new Date(session.expireAt) > new Date()) {
       next();

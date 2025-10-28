@@ -92,7 +92,7 @@
             class="bg-[#4f46e5] hover:bg-[#4e46e5e1] text-white px-4 py-2 rounded-lg"
           >
             <Loader2 v-if="loading" class="animate-spin h-5 w-5 mx-auto" />
-            <div v-else class="lex items-center gap-2">
+            <div v-else class="flex items-center gap-2">
               <component :is="editingId ? Save : Plus" size="18" />
               {{ editingId ? 'Save Changes' : 'Add Ticket' }}
             </div>
@@ -100,15 +100,41 @@
         </div>
       </form>
 
+      <ConfirmationModal
+        :open="showModal"
+        :title="selectedTicket?.title || ''"
+        @close="closeModal"
+        @confirm="deleteTicket"
+      />
+
       <!-- Ticket List -->
       <div class="mt-7 shadow rounded-lg p-8">
-        <p v-if="tickets.length === 0" class="text-gray-500 text-center">No tickets found.</p>
+        <div v-if="isError" class="flex justify-center items-center gap-2">
+          <p>Failed to load tickets. Please</p>
+          <button
+            @click="refetch"
+            class="p-1 px-3 text-sm border-2 rounded-xl flex justify-center gap-1.5 bg-white"
+          >
+            Retry
+          </button>
+        </div>
+
+        <div v-else-if="isLoading || isFetching" class="flex gap-1 items-center justify-center">
+          <Loader2 class="animate-spin h-6 w-6 text-gray-500" />
+          <span class="text-gray-500 text-sm">Loading</span>
+        </div>
+
+        <p v-else-if="!tickets?.length" class="text-gray-500 text-center">
+          No tickets found.
+        </p>
+
         <ul v-else class="grid grid-cols-1 md:grid-cols-2 gap-3">
           <TicketCard
-            v-for="(ticket, index) in tickets"
-            :key="index"
+            v-for="ticket in tickets"
+            :key="ticket.id"
             :ticket="ticket"
             @edit="startEdit"
+            @delete="openDeleteModal"
           />
         </ul>
       </div>
@@ -117,100 +143,125 @@
 </template>
 
 <script setup>
-    import { ref, onMounted, watch } from "vue";
-    import { useRouter } from "vue-router";
-    import { toast } from "vue3-toastify";
-    import { Plus, Save } from "lucide-vue-next";
-    import TicketCard from "@/components/TicketCard.vue";
-    import {
-    getAllTickets,
-    createTicket,
-    editTicket,
-    getTicketById,
-    } from "@/services/ticketService.js";
+import { ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
+import { useQuery } from '@tanstack/vue-query'
+import { toast } from 'vue3-toastify'
+import { Plus, Save, Loader2 } from 'lucide-vue-next'
+import TicketCard from '@/components/TicketCard.vue'
+import {
+  getAllTickets,
+  createTicket,
+  editTicket,
+  getTicketById,
+  deleteTicket as removeTicket
+} from '@/services/ticketService.js';
+import ConfirmationModal from '../components/ConfirmationModal.vue'
 
-    // router instance
-    const router = useRouter();
+const router = useRouter()
 
-    // states
-    const tickets = ref(getAllTickets() || []);
-    const form = ref({
-        title: "",
-        description: "",
-        status: "open",
-        priority: "",
-    });
-    const errors = ref({});
-    const editingId = ref(null);
-    const loading = ref(false)
+// Form state
+const form = ref({
+  title: '',
+  description: '',
+  status: 'open',
+  priority: '',
+})
+const errors = ref({})
+const editingId = ref(null)
+const loading = ref(false);
 
-    // load tickets & check session
-    onMounted(() => {
-        const session = localStorage.getItem("ticketapp_session");
-        if (!session) {
-            router.push("/auth/login");
-        } else {
-            tickets.value = JSON.parse(localStorage.getItem("tickets")) || [];
-        }
-    });
+const showModal = ref(false);
+const selectedTicket = ref(null);
 
-    // when editingId changes, load the ticket data
-    watch(editingId, (id) => {
-        if (id) {
-            form.value = getTicketById(id);
-        }
-    });
+const openDeleteModal = (ticket) => {
+  selectedTicket.value = ticket;
+  showModal.value = true;
+};
 
-    // validation
-    const validate = (data) => {
-        const newErrors = {};
-        if (!data.title.trim()) newErrors.title = "Title is required.";
-        if (!data.status.trim())
-            newErrors.status = "Status is required.";
-        else if (!["open", "in_progress", "closed"].includes(data.status))
-            newErrors.status = "Invalid status.";
-        if (data.description && data.description.length > 200)
-            newErrors.description = "Description must be under 200 characters.";
-        if (data.priority && !["low", "medium", "high"].includes(data.priority))
-            newErrors.priority = "Invalid priority.";
-        errors.value = newErrors;
-        return Object.keys(newErrors).length === 0;
-    };
+const closeModal = () => {
+  showModal.value = false;
+};
 
-    // add / edit ticket
-    const addTicket = () => {
-      if(loading.value) return
-      if (!validate(form.value)) return;
+const deleteTicket = async () => {
+  try {
+    await removeTicket(selectedTicket.value.id)
+    showModal.value = false;
+    await refetch()
+  } catch (err) {
+    toast.error(err.message ||  "Failed to delete")
+  }
+};
 
-      loading.value = true
-      try {
-        if (editingId.value) {
-          editTicket({ id: editingId.value, ...form.value });
-          tickets.value = getAllTickets();
-          editingId.value = null;
-          toast.success("Ticket updated successfully!");
-        } else {
-          createTicket(form.value);
-          tickets.value = getAllTickets();
-          toast.success("Ticket created successfully!");
-        }
-      } catch (err) {
-        toast.error(`Failed to ${editingId ? "edit" : "create"} ticket.`)
-      } finally {
-        loading.value = false
-      }
+// Fetch tickets with useQuery
+const {
+  data: tickets,
+  isLoading,
+  isFetching,
+  isError,
+  refetch,
+} = useQuery({
+  queryKey: ['tickets'],
+  queryFn: getAllTickets,
+  refetchOnWindowFocus: false,
+})
 
-      form.value = { title: "", description: "", status: "open", priority: "" };
-    };
+// Validation
+const validate = (data) => {
+  const newErrors = {}
+  if (!data.title.trim()) newErrors.title = 'Title is required.'
+  if (!data.status.trim()) newErrors.status = 'Status is required.'
+  else if (!['open', 'in_progress', 'closed'].includes(data.status))
+    newErrors.status = 'Invalid status.'
+  if (data.description && data.description.length > 200)
+    newErrors.description = 'Description must be under 200 characters.'
+  if (data.priority && !['low', 'medium', 'high'].includes(data.priority))
+    newErrors.priority = 'Invalid priority.'
+  errors.value = newErrors
+  return Object.keys(newErrors).length === 0
+}
 
+// Add / Edit ticket
+const addTicket = async () => {
+  if (loading.value) return
+  if (!validate(form.value)) return
 
-    const cancelEdit = () => {
-        editingId.value = null;
-        form.value = { title: "", description: "", status: "open", priority: "" };
-    };
+  loading.value = true
+  try {
+    if (editingId.value) {
+      await editTicket({ id: editingId.value, ...form.value })
+      await refetch()
+      editingId.value = null
+      toast.success('Ticket updated successfully!')
+    } else {
+      await createTicket(form.value)
+      await refetch()
+      toast.success('Ticket created successfully!')
+    }
+  } catch (err) {
+    if(editingId.value) {
+      editingId.value = null;
+    }
 
-    // start editing
-    const startEdit = (id) => {
-        editingId.value = id;
-    };
+    toast.error(err.message || `Failed to ${editingId ? 'edit' : 'create'} ticket.`)
+  } finally {
+    loading.value = false
+  }
+
+  form.value = { title: '', description: '', status: 'open', priority: '' }
+}
+
+// Edit
+watch(editingId, (id) => {
+  if (id) form.value = getTicketById(id)
+})
+
+const cancelEdit = () => {
+  editingId.value = null
+  form.value = { title: '', description: '', status: 'open', priority: '' }
+}
+
+const startEdit = (id) => {
+  editingId.value = id
+}
 </script>

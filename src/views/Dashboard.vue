@@ -7,8 +7,8 @@
         @click="handleLogout"
         class="bg-[#4f46e5] hover:bg-[#4e46e5e1] text-white text-sm px-2 py-2 rounded-lg"
       >
-        <Loader2 v-if="loading" class="animate-spin h-5 w-5 mx-auto" />
-        <div v-else class="items-center gap-2">
+        <Loader2 v-if="loading" class="animate-spin h-5 w-5" />
+        <div v-else class="flex items-center gap-2">
           <LogOut size="15" />
           Logout
         </div>
@@ -74,12 +74,12 @@
   const stats = getTicketsStats();
 
   // handle logout
-  const handleLogout = () => {
+  const handleLogout = async () => {
     if(loading.value) return
 
     loading.value = true
     try {
-      logoutUser();
+      await logoutUser();
       router.push("/auth/login");
     } catch (err) {
       toast.error(err.message || "Failed to logout")
